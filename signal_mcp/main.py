@@ -33,6 +33,16 @@ class SignalConfig:
     transport: str = "sse"
 
 
+@dataclass
+class MessageResponse:
+    """Structured result for received messages."""
+
+    message: Optional[str] = None
+    sender_id: Optional[str] = None
+    group_name: Optional[str] = None
+    error: Optional[str] = None
+
+
 class SignalError(Exception):
     """Base exception for Signal-related errors."""
 
@@ -47,9 +57,6 @@ class SignalCLIError(SignalError):
 
 SuccessResponse = Dict[str, str]
 ErrorResponse = Dict[str, str]
-MessageResponse = Union[
-    Tuple[Optional[str], Optional[str], Optional[str]], ErrorResponse
-]
 
 # Global config instance
 config = SignalConfig()
@@ -126,7 +133,7 @@ async def _send_message(message: str, target: str, is_group: bool = False) -> bo
 
 async def _parse_receive_output(
     stdout: str,
-) -> Optional[Tuple[str, str, Optional[str]]]:
+) -> Optional[MessageResponse]:
     """Parse the output of signal-cli receive command."""
     logger.debug("Parsing received message output")
 
@@ -175,7 +182,9 @@ async def _parse_receive_output(
                             f"Successfully parsed message from {sender}"
                             + (f" in group {group}" if group else "")
                         )
-                        return msg, sender, group
+                        return MessageResponse(
+                            message=msg, sender_id=sender, group_name=group
+                        )
 
         elif line.startswith("Group info:"):
             if current_envelope:
@@ -250,30 +259,29 @@ async def receive_message(timeout: float) -> MessageResponse:
         if return_code != 0:
             if "timeout" in stderr.lower():
                 logger.info("Receive timeout reached with no messages")
-                return None, None, None
+                return MessageResponse()
             else:
                 logger.error(f"Error receiving message: {stderr}")
-                return {"error": f"Failed to receive message: {stderr}"}
+                return MessageResponse(error=f"Failed to receive message: {stderr}")
 
         if not stdout.strip():
             logger.info("No message received within timeout")
-            return None, None, None
+            return MessageResponse()
 
         result = await _parse_receive_output(stdout)
         if result:
-            message, sender, group = result
             logger.info(
-                f"Successfully received message from {sender}"
-                + (f" in group {group}" if group else "")
+                f"Successfully received message from {result.sender_id}"
+                + (f" in group {result.group_name}" if result.group_name else "")
             )
             return result
         else:
             logger.error("Received message but couldn't parse the output format")
-            return {"error": "Failed to parse message output"}
+            return MessageResponse(error="Failed to parse message output")
 
     except Exception as e:
         logger.error(f"Error in receive_message: {str(e)}", exc_info=True)
-        return {"error": str(e)}
+        return MessageResponse(error=str(e))
 
 
 async def initialize_server() -> SignalConfig:

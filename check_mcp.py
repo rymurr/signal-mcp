@@ -32,7 +32,10 @@ async def main():
             # Call a tool to send a message
             send_result = await session.call_tool(
                 "send_message_to_user",
-                {"message": "Hello from MCP stdio client!", "user_id": os.environ["RECEIVER_NUMBER"]},
+                {
+                    "message": "Hello from MCP stdio client!",
+                    "user_id": os.environ["RECEIVER_NUMBER"],
+                },
             )
             print(f"Send result: {send_result}")
 
