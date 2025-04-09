@@ -284,7 +284,7 @@ async def receive_message(timeout: float) -> MessageResponse:
         return MessageResponse(error=str(e))
 
 
-async def initialize_server() -> SignalConfig:
+def initialize_server() -> SignalConfig:
     """Initialize the Signal server with configuration."""
     logger.info("Initializing Signal server")
 
@@ -310,28 +310,22 @@ async def initialize_server() -> SignalConfig:
     return config
 
 
-async def run_mcp_server():
+def run_mcp_server():
     """Run the MCP server in the current event loop."""
-    config = await initialize_server()
+    config = initialize_server()
 
     transport = config.transport
     logger.info(f"Starting MCP server with transport: {transport}")
 
-    if transport == "stdio":
-        logger.info("Running MCP server with stdio transport")
-        await mcp.run_stdio_async()
-    elif transport == "sse":
-        logger.info(
-            f"Running MCP server with SSE transport on {mcp.settings.host}:{mcp.settings.port}"
-        )
-        await mcp.run_sse_async()
+    return transport
 
 
 def main():
     """Main function to run the Signal MCP server."""
     logger.info("Starting Signal MCP server")
     try:
-        asyncio.run(run_mcp_server())
+        transport = run_mcp_server()
+        mcp.run(transport)
     except Exception as e:
         logger.error(f"Error running Signal MCP server: {str(e)}", exc_info=True)
         raise
